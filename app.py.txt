@@ -1,247 +1,435 @@
-import streamlit as st
-from gtts import gTTS
-import io
-import streamlit.components.v1 as components
-
-# Sayfa Yapılandırması
-st.set_page_config(page_title="İngilizce Telaffuz Alıştırması", page_icon="🗣️", layout="centered")
-
-# CSS ile Pastel Renkler ve Stil Tanımlamaları
-st.markdown("""
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>İngilizce Telaffuz Alıştırması</title>
+    <!-- Tailwind CSS ve Font Awesome ikonları -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Konfeti Kütüphanesi -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <style>
-    /* Arka Plan */
-    .stApp {
-        background: linear-gradient(135deg, #fef6fb 0%, #e6f0fa 100%);
-    }
-    
-    /* Başlık */
-    .main-title {
-        color: #4a5568;
-        text-align: center;
-        font-family: 'Comic Sans MS', cursive, sans-serif;
-        padding: 5px;
-    }
-    
-    /* Bilgi Kutusu */
-    .info-box {
-        background-color: #ffffff;
-        border: 2px solid #e2e8f0;
-        border-radius: 12px;
-        padding: 15px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-        margin-bottom: 20px;
-        font-size: 14px;
-    }
-    
-    /* Yıldız Sayacı */
-    .star-counter {
-        background-color: #fef3c7;
-        border: 2px solid #fde68a;
-        border-radius: 20px;
-        padding: 10px 20px;
-        text-align: center;
-        font-size: 18px;
-        font-weight: bold;
-        color: #d97706;
-        display: block;
-        margin-bottom: 20px;
-    }
-    </style>
-""", unsafe_allow_html=True)
-
-# Başlık
-st.markdown("<h1 class='main-title'>🗣️ İngilizce Telaffuz Alıştırması</h1>", unsafe_allow_html=True)
-
-# Kelimeler ve Türkçe Okunuş İpuçları Sözlüğü
-word_hints = {
-    "the": "dı / dıı",
-    "join": "coyn",
-    "jump": "camp",
-    "who": "huu",
-    "are": "aa",
-    "think": "fink (dişlerin arasından s sızdırarak)",
-    "thought": "foot (dişlerin arasından f/t sızdırarak)",
-    "about": "ıbaut",
-    "refuse": "rifyuz",
-    "use": "yuz",
-    "she": "şii",
-    "chat": "çet",
-    "accept": "eksept",
-    "language": "lenguiç",
-    "umbrella": "ambrella",
-    "quick": "kuik",
-    "what": "vat",
-    "where": "vee",
-    "three": "trii (dişlerin arasından t sızdırarak)",
-    "speak": "spiik",
-    "sign": "sayn",
-    "location": "lokeyşın",
-    "bathroom": "baatruum",
-    "today": "tudey",
-    "wednesday": "venzdey",
-    "thursday": "förzdey",
-    "watch": "voç",
-    "rarely": "reerli",
-    "usually": "yujıli",
-    "generally": "cenırli",
-    "currently": "karantli",
-    "university": "yunivörsiti",
-    "choose": "çuuz",
-    "country": "kantri"
-}
-
-# Kelime listesini sıralayalım
-words = sorted(list(word_hints.keys()))
-
-# Session State Hafızası (Sayfa açık kaldığı sürece verileri tutar)
-if "stars" not in st.session_state:
-    st.session_state.stars = 0
-if "completed_words" not in st.session_state:
-    st.session_state.completed_words = set()
-
-# Üst Bilgi ve Skor Paneli
-col_info, col_star = st.columns([2, 1])
-
-with col_info:
-    st.markdown("""
-    <div class='info-box'>
-        🎯 <b>Nasıl Çalışır?</b><br>
-        1. Listeden bir kelime seçin.<br>
-        2. Doğru telaffuzu dinleyin ve kendi sesinizi kaydedin.<br>
-        3. Başardıysanız işaretleyin ve yıldızı kapın!<br>
-        💡 <b>Tureng İpucu:</b> Kelime kutusuna <b>3 saniye basılı tutarak</b> doğrudan kelimenin anlamına Tureng'den bakabilirsiniz.
-    </div>
-    """, unsafe_allow_html=True)
-
-with col_star:
-    st.markdown(f"<div class='star-counter'>⭐ Toplam Yıldız: {st.session_state.stars}</div>", unsafe_allow_html=True)
-
-# Kelime Seçim Alanı
-selected_word = st.selectbox("🎯 Çalışmak istediğin kelimeyi seç:", words)
-
-# Tureng Bağlantılı İnteraktif Kelime Kutusu (Custom HTML/JS Component)
-# 3 saniye basılı tutulduğunda Tureng linkini yeni sekmede açar.
-word_box_html = f"""
-<div id="word-container" style="
-    background-color: #edf2f7;
-    border: 3px solid #cbd5e1;
-    border-radius: 15px;
-    padding: 20px;
-    text-align: center;
-    cursor: pointer;
-    user-select: none;
-    transition: background-color 0.2s;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-">
-    <div style="font-size: 32px; font-weight: bold; color: #2d3748; margin-bottom: 5px;">{selected_word}</div>
-    <div style="font-size: 14px; color: #4a5568; font-style: italic;">Okunuşu: {word_hints[selected_word]}</div>
-    <div id="status" style="font-size: 11px; color: #a0aec0; margin-top: 8px;">Tureng sözlük için 3 saniye basılı tutun...</div>
-</div>
-
-<script>
-const container = document.getElementById('word-container');
-const statusText = document.getElementById('status');
-let pressTimer;
-
-function startPress() {{
-    container.style.backgroundColor = "#e2e8f0";
-    statusText.innerText = "Bekleyin...";
-    pressTimer = window.setTimeout(function() {{
-        window.open('https://tureng.com/tr/turkce-ingilizce/{selected_word}', '_blank');
-        statusText.innerText = "Tureng açıldı!";
-        container.style.backgroundColor = "#edf2f7";
-    }}, 3000);
-}}
-
-function cancelPress() {{
-    clearTimeout(pressTimer);
-    container.style.backgroundColor = "#edf2f7";
-    statusText.innerText = "Tureng sözlük için 3 saniye basılı tutun...";
-}}
-
-container.addEventListener('mousedown', startPress);
-container.addEventListener('mouseup', cancelPress);
-container.addEventListener('mouseleave', cancelPress);
-
-container.addEventListener('touchstart', startPress);
-container.addEventListener('touchend', cancelPress);
-container.addEventListener('touchcancel', cancelPress);
-</script>
-"""
-
-# HTML Bileşenini Streamlit'e yerleştiriyoruz
-components.html(word_box_html, height=135)
-
-st.markdown("---")
-
-# 1. ADIM: Doğru Okunuşu Dinleme (gTTS)
-st.write("### 1. Doğru Telaffuzu Dinle")
-tts = gTTS(text=selected_word, lang='en', tld='com')
-fp = io.BytesIO()
-tts.write_to_fp(fp)
-fp.seek(0)
-st.audio(fp, format='audio/mp3')
-
-st.markdown("---")
-
-# 2. ADIM: Ses Kaydı (Geçici)
-st.write("### 2. Kendi Sesini Kaydet")
-audio_value = st.audio_input("Mikrofonu açmak için tıklatın ve konuşun:")
-
-if audio_value:
-    st.write("🎤 Kendi sesiniz:")
-    st.audio(audio_value, format="audio/wav")
-
-st.markdown("---")
-
-# 3. ADIM: Başarı ve Konfeti Patlatma
-st.write("### 3. Durumunu Değerlendir")
-
-is_already_done = selected_word in st.session_state.completed_words
-
-# Onay kutusuna basıldığında konfeti tetiklemesi
-is_checked = st.checkbox("🎉 Bu kelimeyi doğru telaffuz etmeyi başardım!", value=is_already_done, key=f"check_{selected_word}")
-
-if is_checked:
-    if selected_word not in st.session_state.completed_words:
-        st.session_state.completed_words.add(selected_word)
-        st.session_state.stars += 1
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&family=Quicksand:wght@400;600;700&display=swap');
         
-        # Konfeti patlatmak için HTML/JS kodu enjekte ediyoruz
-        confetti_html = """
-        <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
-        <script>
-            // Farklı açılardan konfeti patlatma efekti
-            var duration = 3 * 1000;
+        body {
+            font-family: 'Quicksand', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        
+        .funny-title {
+            font-family: 'Fredoka One', cursive;
+        }
+
+        /* Arka plan renk temaları */
+        .bg-pastel-pink { background: linear-gradient(135deg, #fbcfe8 0%, #f5d0fe 100%); }
+        .bg-pastel-blue { background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%); }
+        .bg-pastel-green { background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%); }
+        .bg-pastel-yellow { background: linear-gradient(135deg, #fef9c3 0%, #fef08a 100%); }
+
+        /* Basılı tutma efekti için animasyon */
+        @keyframes progress-bar {
+            from { width: 0%; }
+            to { width: 100%; }
+        }
+        .holding-progress {
+            animation: progress-bar 3s linear forwards;
+        }
+    </style>
+</head>
+<body class="bg-pastel-blue min-h-screen transition-all duration-500 pb-12" id="body-bg">
+
+    <div class="max-w-md mx-auto px-4 pt-6">
+        
+        <!-- ÜST PANEL: Tema Seçimi & Yıldız Sayacı -->
+        <div class="flex justify-between items-center mb-6">
+            <!-- Renkli Tema Değiştirici -->
+            <div class="flex space-x-2 bg-white/60 p-1.5 rounded-full shadow-sm">
+                <button onclick="changeTheme('blue')" class="w-6 h-6 rounded-full bg-sky-300 border-2 border-white focus:outline-none"></button>
+                <button onclick="changeTheme('pink')" class="w-6 h-6 rounded-full bg-pink-300 border-2 border-white focus:outline-none"></button>
+                <button onclick="changeTheme('green')" class="w-6 h-6 rounded-full bg-emerald-300 border-2 border-white focus:outline-none"></button>
+                <button onclick="changeTheme('yellow')" class="w-6 h-6 rounded-full bg-yellow-300 border-2 border-white focus:outline-none"></button>
+            </div>
+
+            <!-- Yıldız Sayacı -->
+            <div class="bg-yellow-100 border-2 border-yellow-300 rounded-full px-4 py-2 flex items-center space-x-2 shadow-md animate-bounce">
+                <span class="text-xl">⭐</span>
+                <span class="font-bold text-yellow-800 text-lg" id="star-count">0</span>
+            </div>
+        </div>
+
+        <!-- BAŞLIK -->
+        <div class="text-center mb-6">
+            <h1 class="funny-title text-3xl text-sky-800 tracking-wide drop-shadow-sm">🗣️ Speak Right!</h1>
+            <p class="text-sm text-sky-900/70 font-semibold mt-1">İngilizce Telaffuz Alıştırması</p>
+        </div>
+
+        <!-- YÖNERGE KUTUSU -->
+        <div class="bg-white/95 rounded-2xl p-4 shadow-md border border-sky-100 mb-6 text-sm text-slate-700 space-y-2">
+            <div class="flex items-start space-x-2">
+                <span class="text-sky-500 mt-0.5"><i class="fa-solid fa-circle-info"></i></span>
+                <p><strong>Nasıl Yapılır?</strong> Listeden bir kelime seç. Hoparlör simgelerinden birine tıklayarak doğru telaffuzu dinle.</p>
+            </div>
+            <div class="flex items-start space-x-2">
+                <span class="text-sky-500 mt-0.5"><i class="fa-solid fa-microphone"></i></span>
+                <p>Mikrofon butonuna basarak kendi sesini kaydet, dinle ve karşılaştır. Başardığında yeşil butona tıkla!</p>
+            </div>
+            <div class="flex items-start space-x-2">
+                <span class="text-amber-500 mt-0.5"><i class="fa-solid fa-lightbulb"></i></span>
+                <p><strong>Tureng Sözlük:</strong> Kelime kartına <strong>3 saniye basılı tutarak</strong> doğrudan kelime anlamına bakabilirsin!</p>
+            </div>
+        </div>
+
+        <!-- KELİME SEÇİM ALANI -->
+        <div class="mb-6">
+            <label for="word-select" class="block text-sm font-bold text-sky-900 mb-2">🎯 Çalışmak İstediğin Kelimeyi Seç:</label>
+            <select id="word-select" onchange="selectWord(this.value)" class="w-full p-4 rounded-xl border-2 border-sky-200 bg-white text-lg font-bold text-slate-700 shadow-sm focus:border-sky-400 focus:ring-0 outline-none">
+                <!-- Javascript dinamik dolduracak -->
+            </select>
+        </div>
+
+        <!-- BÜYÜK ETKİLEŞİMLİ KELİME KARTU (3 Saniye Tureng Tetikleyicili) -->
+        <div class="relative overflow-hidden bg-white rounded-3xl p-8 text-center shadow-lg border-2 border-sky-100 mb-6 cursor-pointer active:scale-95 transition-all duration-150" 
+             id="word-card">
+            
+            <!-- Süre İlerleme Barı -->
+            <div class="absolute bottom-0 left-0 h-2 bg-sky-400 w-0" id="progress-bar"></div>
+
+            <div class="text-5xl font-extrabold text-sky-900 tracking-wide funny-title mb-2" id="display-word">the</div>
+            <div class="text-lg text-slate-500 font-semibold italic flex justify-center items-center space-x-1">
+                <span class="text-sm">📢 Okunuşu:</span>
+                <span id="display-hint" class="text-sky-600 not-italic font-bold">dı / dıı</span>
+            </div>
+            <div class="text-xs text-slate-400 mt-4 flex items-center justify-center space-x-1">
+                <i class="fa-solid fa-arrow-pointer animate-pulse"></i>
+                <span>Tureng sözlük için 3 saniye basılı tut</span>
+            </div>
+        </div>
+
+        <!-- SES DİNLEME ALANI (NORMAL & YAVAŞ) -->
+        <div class="grid grid-cols-2 gap-4 mb-6">
+            <button onclick="playTTS(1.0)" class="bg-sky-500 hover:bg-sky-600 active:scale-95 text-white font-bold p-4 rounded-2xl shadow-md flex flex-col items-center justify-center space-y-1 transition-all">
+                <i class="fa-solid fa-volume-high text-2xl"></i>
+                <span class="text-sm">Normal Hızda Dinle</span>
+            </button>
+            <button onclick="playTTS(0.65)" class="bg-amber-400 hover:bg-amber-500 active:scale-95 text-white font-bold p-4 rounded-2xl shadow-md flex flex-col items-center justify-center space-y-1 transition-all">
+                <i class="fa-solid fa-volume-low text-2xl"></i>
+                <span class="text-sm">Yavaş Hızda Dinle</span>
+            </button>
+        </div>
+
+        <!-- MİKROFON SES KAYIT ALANI -->
+        <div class="bg-white rounded-2xl p-5 shadow-md border border-sky-100 mb-6 text-center">
+            <h3 class="text-sm font-bold text-slate-500 mb-4 flex items-center justify-center space-x-2">
+                <i class="fa-solid fa-microphone text-red-400 animate-pulse"></i>
+                <span>Sesini Kaydet ve Dinle</span>
+            </h3>
+            
+            <div class="flex items-center justify-center space-x-4 mb-4">
+                <!-- Kayıt Başlat/Durdur Butonu -->
+                <button id="record-btn" onclick="toggleRecording()" class="w-16 h-16 rounded-full bg-red-500 hover:bg-red-600 active:scale-90 text-white flex items-center justify-center shadow-lg transition-all">
+                    <i class="fa-solid fa-microphone text-2xl" id="mic-icon"></i>
+                </button>
+            </div>
+
+            <!-- Kayıt Durumu Metni -->
+            <p id="record-status" class="text-xs font-semibold text-slate-400 mb-3">Kaydetmek için kırmızı mikrofona tıklatın</p>
+
+            <!-- Öğrencinin Kendi Ses Oynatıcısı -->
+            <div id="audio-playback-container" class="hidden border-t pt-4 mt-2">
+                <p class="text-xs font-bold text-emerald-600 mb-2">🎤 Senin Telaffuzun (Karşılaştır):</p>
+                <audio id="audio-playback" controls class="w-full h-10"></audio>
+            </div>
+        </div>
+
+        <!-- BAŞARDIM / KUTLAMA BUTONU -->
+        <div class="mb-6">
+            <button id="success-btn" onclick="toggleWordSuccess()" class="w-full bg-slate-200 hover:bg-emerald-400 hover:text-white text-slate-600 font-extrabold p-5 rounded-2xl shadow-md flex items-center justify-center space-x-3 transition-all text-lg">
+                <span id="star-btn-icon" class="text-2xl">⭐</span>
+                <span id="success-btn-text">Bu Kelimeyi Başardım!</span>
+            </button>
+        </div>
+
+        <!-- ALT BİLGİ -->
+        <p class="text-center text-xs text-sky-950/40 font-semibold mt-10">
+            🔒 Kişisel verileriniz gizlidir. Kayıtlarınız sunucuya yüklenmez, yenileyince tamamen temizlenir.
+        </p>
+
+    </div>
+
+    <script>
+        // KELİME LİSTESİ VE TÜRKÇE OKUNUŞ REHBERLERİ
+        const wordList = {
+            "the": "dı / dıı",
+            "join": "coyn",
+            "jump": "camp",
+            "who": "huu",
+            "are": "aa",
+            "think": "fink (dişlerin arasından s sızdırarak)",
+            "thought": "foot (dişlerin arasından f/t sızdırarak)",
+            "about": "ıbaut",
+            "refuse": "rifyuz",
+            "use": "yuz",
+            "she": "şii",
+            "chat": "çet",
+            "accept": "eksept",
+            "language": "lenguiç",
+            "umbrella": "ambrella",
+            "quick": "kuik",
+            "what": "vat",
+            "where": "vee",
+            "three": "trii (dişlerin arasından t sızdırarak)",
+            "speak": "spiik",
+            "sign": "sayn",
+            "location": "lokeyşın",
+            "bathroom": "baatruum",
+            "today": "tudey",
+            "wednesday": "venzdey",
+            "thursday": "förzdey",
+            "watch": "voç",
+            "rarely": "reerli",
+            "usually": "yujıli",
+            "generally": "cenırli",
+            "currently": "karantli",
+            "university": "yunivörsiti",
+            "choose": "çuuz",
+            "country": "kantri"
+        };
+
+        // Alfabetik Sıralama Yapalım
+        const sortedWords = Object.keys(wordList).sort();
+
+        // Hafıza Durumları (Sayfa yenilendiğinde tamamen uçar)
+        let currentWord = sortedWords[0];
+        let totalStars = 0;
+        let completedWords = new Set();
+        
+        // Ses Kayıt Değişkenleri
+        let mediaRecorder;
+        let audioChunks = [];
+        let isRecording = false;
+
+        // Tureng Basılı Tutma Zamanlayıcı Değişkenleri
+        let pressTimer;
+        let isHolding = false;
+
+        // Sayfa Yüklendiğinde Başlat
+        window.onload = function() {
+            const selectEl = document.getElementById('word-select');
+            
+            // Seçenek listesini doldur
+            sortedWords.forEach(word => {
+                const opt = document.createElement('option');
+                opt.value = word;
+                opt.innerText = word;
+                selectEl.appendChild(opt);
+            });
+
+            // İlk Kelimeyi Kur
+            selectWord(currentWord);
+
+            // Tureng Basılı Tutma Dinleyicileri (Masaüstü ve Mobil için)
+            const card = document.getElementById('word-card');
+            
+            // Mouse Olayları
+            card.addEventListener('mousedown', startPress);
+            card.addEventListener('mouseup', cancelPress);
+            card.addEventListener('mouseleave', cancelPress);
+
+            // Dokunmatik Ekran (Mobil) Olayları
+            card.addEventListener('touchstart', function(e) {
+                e.preventDefault(); // Sürükleme veya büyüteç açma davranışlarını engelle
+                startPress();
+            });
+            card.addEventListener('touchend', cancelPress);
+            card.addEventListener('touchcancel', cancelPress);
+        };
+
+        // Tema Seçimi Değiştirici
+        function changeTheme(theme) {
+            const body = document.getElementById('body-bg');
+            body.className = "min-h-screen transition-all duration-500 pb-12";
+            if (theme === 'blue') body.classList.add('bg-pastel-blue');
+            if (theme === 'pink') body.classList.add('bg-pastel-pink');
+            if (theme === 'green') body.classList.add('bg-pastel-green');
+            if (theme === 'yellow') body.classList.add('bg-pastel-yellow');
+        }
+
+        // Kelime Değiştirme Tetikleyicisi
+        function selectWord(word) {
+            currentWord = word;
+            document.getElementById('display-word').innerText = word;
+            document.getElementById('display-hint').innerText = wordList[word];
+            document.getElementById('word-select').value = word;
+
+            // Ses kayıt alanını gizle/sıfırla
+            document.getElementById('audio-playback-container').classList.add('hidden');
+            document.getElementById('audio-playback').src = '';
+            document.getElementById('record-status').innerText = "Kaydetmek için kırmızı mikrofona tıklatın";
+            document.getElementById('mic-icon').className = "fa-solid fa-microphone text-2xl";
+            isRecording = false;
+
+            // Başardım butonunu güncelle
+            updateSuccessButtonState();
+        }
+
+        // Web Speech API ile TTS Doğru Ses Telaffuzu Dinleme
+        function playTTS(rate) {
+            // Eğer tarayıcıda konuşma desteği varsa
+            if ('speechSynthesis' in window) {
+                // Aktif konuşmaları iptal et
+                window.speechSynthesis.cancel();
+
+                const utterance = new SpeechSynthesisUtterance(currentWord);
+                utterance.lang = 'en-US'; // Amerikan İngilizcesi
+                utterance.rate = rate;    // Konuşma hızı
+
+                window.speechSynthesis.speak(utterance);
+            } else {
+                alert("Üzgünüz, tarayıcınız konuşma sentezleme özelliğini desteklemiyor.");
+            }
+        }
+
+        // SES KAYDETME FONKSİYONLARI (Web Audio API)
+        async function toggleRecording() {
+            const statusText = document.getElementById('record-status');
+            const micIcon = document.getElementById('mic-icon');
+
+            if (!isRecording) {
+                // Kayıt Başlatılıyor
+                audioChunks = [];
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(stream);
+                    
+                    mediaRecorder.ondataavailable = event => {
+                        audioChunks.push(event.data);
+                    };
+
+                    mediaRecorder.onstop = () => {
+                        const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                        const audioUrl = URL.createObjectURL(audioBlob);
+                        
+                        const playback = document.getElementById('audio-playback');
+                        playback.src = audioUrl;
+                        document.getElementById('audio-playback-container').classList.remove('hidden');
+                    };
+
+                    mediaRecorder.start();
+                    isRecording = true;
+                    statusText.innerText = "Konuşun... Kayıt yapılıyor... Durdurmak için tekrar basın.";
+                    statusText.classList.add('text-red-500', 'font-bold');
+                    micIcon.className = "fa-solid fa-square text-2xl animate-pulse"; // Durdurma simgesi
+                } catch (err) {
+                    console.log("Mikrofon izni alınamadı veya mikrofon bulunamadı.", err);
+                    statusText.innerText = "Mikrofon izni verilmedi veya cihaz bulunamadı!";
+                }
+            } else {
+                // Kayıt Durduruluyor
+                if (mediaRecorder && mediaRecorder.state !== "inactive") {
+                    mediaRecorder.stop();
+                    // Mikrofon kullanımını serbest bırak
+                    mediaRecorder.stream.getTracks().forEach(track => track.stop());
+                }
+                isRecording = false;
+                statusText.innerText = "Kayıt tamamlandı! Aşağıdan dinleyebilirsiniz.";
+                statusText.classList.remove('text-red-500', 'font-bold');
+                micIcon.className = "fa-solid fa-microphone text-2xl";
+            }
+        }
+
+        // BAŞARDIM / YILDIZ GÜNCELLEME ALANI
+        function toggleWordSuccess() {
+            const successBtn = document.getElementById('success-btn');
+
+            if (completedWords.has(currentWord)) {
+                // Eğer zaten başardıysa ve geri almak istiyorsa
+                completedWords.delete(currentWord);
+                totalStars = Math.max(0, totalStars - 1);
+            } else {
+                // Yeni kelimeyi başardıysa
+                completedWords.add(currentWord);
+                totalStars++;
+                
+                // Konfeti fırlat (Harika Efekt!)
+                triggerConfetti();
+            }
+
+            // Yıldız sayısını güncelle
+            document.getElementById('star-count').innerText = totalStars;
+            updateSuccessButtonState();
+        }
+
+        // Başardım Buton Görünüm Güncellemesi
+        function updateSuccessButtonState() {
+            const successBtn = document.getElementById('success-btn');
+            const icon = document.getElementById('star-btn-icon');
+            const btnText = document.getElementById('success-btn-text');
+
+            if (completedWords.has(currentWord)) {
+                // Başarılmış durum
+                successBtn.className = "w-full bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold p-5 rounded-2xl shadow-md flex items-center justify-center space-x-3 transition-all text-lg border-b-4 border-emerald-700";
+                icon.innerText = "⭐";
+                btnText.innerText = "Bu Kelimeyi Başardın! (İptal Et)";
+            } else {
+                // Başarılmamış varsayılan durum
+                successBtn.className = "w-full bg-slate-200 hover:bg-emerald-400 hover:text-white text-slate-600 font-extrabold p-5 rounded-2xl shadow-md flex items-center justify-center space-x-3 transition-all text-lg";
+                icon.innerText = "☆";
+                btnText.innerText = "Bu Kelimeyi Başardım!";
+            }
+        }
+
+        // TURENG 3 SANİYE BASILI TUTMA FONKSİYONLARI
+        function startPress() {
+            isHolding = true;
+            const progressBar = document.getElementById('progress-bar');
+            
+            // Barı sıfırla ve animasyonlu doldur
+            progressBar.className = "absolute bottom-0 left-0 h-2 bg-sky-400 w-0 holding-progress";
+
+            pressTimer = setTimeout(function() {
+                if (isHolding) {
+                    // 3 Saniye tamamlandığında Tureng'i aç
+                    window.open(`https://tureng.com/tr/turkce-ingilizce/${currentWord}`, '_blank');
+                    cancelPress();
+                }
+            }, 3000);
+        }
+
+        function cancelPress() {
+            isHolding = false;
+            clearTimeout(pressTimer);
+            const progressBar = document.getElementById('progress-bar');
+            
+            // Animasyonu durdur ve barı sıfırla
+            progressBar.className = "absolute bottom-0 left-0 h-2 bg-sky-400 w-0";
+        }
+
+        // RENKLİ KONFETİ TETİKLEYİCİSİ
+        function triggerConfetti() {
+            var duration = 2.5 * 1000;
             var end = Date.now() + duration;
 
             (function frame() {
-              confetti({
-                particleCount: 5,
-                angle: 60,
-                spread: 55,
-                origin: { x: 0 }
-              });
-              confetti({
-                particleCount: 5,
-                angle: 120,
-                spread: 55,
-                origin: { x: 1 }
-              });
+                confetti({
+                    particleCount: 5,
+                    angle: 60,
+                    spread: 55,
+                    origin: { x: 0, y: 0.85 }
+                });
+                confetti({
+                    particleCount: 5,
+                    angle: 120,
+                    spread: 55,
+                    origin: { x: 1, y: 0.85 }
+                });
 
-              if (Date.now() < end) {
-                requestAnimationFrame(frame);
-              }
+                if (Date.now() < end) {
+                    requestAnimationFrame(frame);
+                }
             }());
-        </script>
-        """
-        components.html(confetti_html, height=0, width=0)
-        st.success(f"Harika! ⭐ Yıldızını kaptın. Kelime listenize eklendi.")
-        st.rerun()
-else:
-    if selected_word in st.session_state.completed_words:
-        st.session_state.completed_words.remove(selected_word)
-        st.session_state.stars -= 1
-        st.rerun()
-
-st.markdown("<br><br><p style='text-align: center; color: #a0aec0; font-size: 11px;'>Bu sistemde ses verileriniz saklanmaz, yenileyince tamamen sıfırlanır.</p>", unsafe_allow_html=True)
+        }
+    </script>
+</body>
+</html>
