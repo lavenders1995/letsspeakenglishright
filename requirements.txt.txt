@@ -1,3 +1,2 @@
-streamlit
-gtts
-streamlit-mic-recorder
+streamlit>=1.35.0
+gTTS>=2.5.0
