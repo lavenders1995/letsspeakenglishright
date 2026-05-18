@@ -1,6 +1,7 @@
 import streamlit as str
 from gtts import gTTS
 import io
+from streamlit_mic_recorder import mic_recorder  # Yeni ve hatasız kütüphane
 
 # Sayfa Genişliği ve Başlığı
 str.set_page_config(page_title="İngilizce Telaffuz Alıştırması", page_icon="🇬🇧", layout="centered")
@@ -8,11 +9,9 @@ str.set_page_config(page_title="İngilizce Telaffuz Alıştırması", page_icon=
 # --- Pastel ve Estetik CSS Dokunuşları ---
 str.markdown("""
     <style>
-    /* Arka planı yumuşak bir pastel tonu yapalım */
     .stApp {
         background-color: #f7f9fc;
     }
-    /* Ana başlık stili */
     .main-title {
         color: #4a5568;
         text-align: center;
@@ -20,7 +19,6 @@ str.markdown("""
         font-weight: bold;
         padding: 10px;
     }
-    /* Kart ve çerçeve efekti (Daha pro durması için) */
     .word-box {
         border: 2px solid #e2e8f0;
         border-radius: 12px;
@@ -29,7 +27,6 @@ str.markdown("""
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
         margin-bottom: 20px;
     }
-    /* Yıldız paneli stili */
     .star-box {
         background-color: #fef3c7;
         border: 1px solid #fde68a;
@@ -57,14 +54,12 @@ words = [
 ]
 
 # --- Session State (Yenileyince Sıfırlanan Hafıza) ---
-# Kimsenin ses verisi veya ilerlemesi sunucuda kalmaz, sayfa kapanınca/yenilenince silinir.
 if "stars" not in str.session_state:
     str.session_state.stars = 0
 if "completed_words" not in str.session_state:
     str.session_state.completed_words = set()
 
 # --- Yıldız Skor Tablosu ---
-# Öğrencinin yıldızlarını her an görmesi için en üstte sabit tutuyoruz
 str.markdown(f"""
     <div class='star-box'>
         ⭐ Toplam Başarı Yıldızı: {str.session_state.stars}
@@ -81,7 +76,7 @@ str.markdown("</div>", unsafe_with_html=True)
 str.markdown("<div class='word-box'>", unsafe_with_html=True)
 str.write("##### 1. Doğru Telaffuzu Dinle")
 
-# Google TTS ile kelimenin sesini anlık üretme (Sunucuda dosya biriktirmez)
+# Telaffuzu dinle kısmı
 tts = gTTS(text=selected_word, lang='en', tld='com')
 fp = io.BytesIO()
 tts.write_to_fp(fp)
@@ -94,16 +89,18 @@ str.markdown("</div>", unsafe_with_html=True)
 str.markdown("<div class='word-box'>", unsafe_with_html=True)
 str.write("##### 2. Kendi Sesini Kaydet ve Karşılaştır")
 
-# Kullanıcı dostu, tarayıcı tabanlı ses kaydedici bileşeni
-# Not: Bu bileşen canlıda HTTPS protokolü veya yerelde localhost ile çalışır.
-try:
-    from st_audiorec import st_audiorec
-    wav_audio_data = st_audiorec()
-    if wav_audio_data is not None:
-        str.audio(wav_audio_data, format='audio/wav')
-        str.info("Yukarıdaki oynatıcıdan kendi sesini dinle ve doğru telaffuzla karşılaştır!")
-except ImportError:
-    str.warning("Ses kayıt bileşeni yükleniyor veya tarayıcınız desteklemiyor.")
+# Kararlı ve temiz ses kayıt butonu
+audio_record = mic_recorder(
+    start_prompt="🔴 Kaydı Başlat",
+    stop_prompt="⏹️ Kaydı Durdur",
+    just_once=False,
+    key='recorder'
+)
+
+if audio_record:
+    # Kaydedilen sesi anında ekranda oynatır
+    str.audio(audio_record['bytes'], format='audio/wav')
+    str.info("Yukarıdaki oynatıcıdan kendi sesini dinle ve doğru telaffuzla karşılaştır!")
 
 str.markdown("</div>", unsafe_with_html=True)
 
@@ -111,7 +108,6 @@ str.markdown("</div>", unsafe_with_html=True)
 str.markdown("<div class='word-box'>", unsafe_with_html=True)
 str.write("##### 3. Başarı Durumu")
 
-# Kelime daha önce başarılmadıysa buton aktif olur
 if selected_word not in str.session_state.completed_words:
     if str.button(f"✨ '{selected_word}' Kelimesini Doğru Okudum, Yıldızı Kap!"):
         str.session_state.stars += 1
@@ -128,6 +124,6 @@ str.markdown("""
     <p style='text-align: center; color: #a0aec0; font-size: 12px;'>
         Bu uygulama tamamen gizlilik dostudur. Mikrofon izinleri sadece anlık dinleme içindir, 
         ses verileriniz asla bir yere kaydedilmez. Sayfa yenilendiğinde tüm veriler silinir.<br>
-        <i>Mobil cihazlarda ve özellikle Android cihazlarda Chrome kullanılması önerilir.</i>
+        <i>Mobil cihazlarda ve özellikle android cihazlarda Chrome kullanılması önerilir.</i>
     </p>
 """, unsafe_with_html=True)
