@@ -1,0 +1,247 @@
+import streamlit as st
+from gtts import gTTS
+import io
+import streamlit.components.v1 as components
+
+# Sayfa Yapılandırması
+st.set_page_config(page_title="İngilizce Telaffuz Alıştırması", page_icon="🗣️", layout="centered")
+
+# CSS ile Pastel Renkler ve Stil Tanımlamaları
+st.markdown("""
+    <style>
+    /* Arka Plan */
+    .stApp {
+        background: linear-gradient(135deg, #fef6fb 0%, #e6f0fa 100%);
+    }
+    
+    /* Başlık */
+    .main-title {
+        color: #4a5568;
+        text-align: center;
+        font-family: 'Comic Sans MS', cursive, sans-serif;
+        padding: 5px;
+    }
+    
+    /* Bilgi Kutusu */
+    .info-box {
+        background-color: #ffffff;
+        border: 2px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 15px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        margin-bottom: 20px;
+        font-size: 14px;
+    }
+    
+    /* Yıldız Sayacı */
+    .star-counter {
+        background-color: #fef3c7;
+        border: 2px solid #fde68a;
+        border-radius: 20px;
+        padding: 10px 20px;
+        text-align: center;
+        font-size: 18px;
+        font-weight: bold;
+        color: #d97706;
+        display: block;
+        margin-bottom: 20px;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# Başlık
+st.markdown("<h1 class='main-title'>🗣️ İngilizce Telaffuz Alıştırması</h1>", unsafe_allow_html=True)
+
+# Kelimeler ve Türkçe Okunuş İpuçları Sözlüğü
+word_hints = {
+    "the": "dı / dıı",
+    "join": "coyn",
+    "jump": "camp",
+    "who": "huu",
+    "are": "aa",
+    "think": "fink (dişlerin arasından s sızdırarak)",
+    "thought": "foot (dişlerin arasından f/t sızdırarak)",
+    "about": "ıbaut",
+    "refuse": "rifyuz",
+    "use": "yuz",
+    "she": "şii",
+    "chat": "çet",
+    "accept": "eksept",
+    "language": "lenguiç",
+    "umbrella": "ambrella",
+    "quick": "kuik",
+    "what": "vat",
+    "where": "vee",
+    "three": "trii (dişlerin arasından t sızdırarak)",
+    "speak": "spiik",
+    "sign": "sayn",
+    "location": "lokeyşın",
+    "bathroom": "baatruum",
+    "today": "tudey",
+    "wednesday": "venzdey",
+    "thursday": "förzdey",
+    "watch": "voç",
+    "rarely": "reerli",
+    "usually": "yujıli",
+    "generally": "cenırli",
+    "currently": "karantli",
+    "university": "yunivörsiti",
+    "choose": "çuuz",
+    "country": "kantri"
+}
+
+# Kelime listesini sıralayalım
+words = sorted(list(word_hints.keys()))
+
+# Session State Hafızası (Sayfa açık kaldığı sürece verileri tutar)
+if "stars" not in st.session_state:
+    st.session_state.stars = 0
+if "completed_words" not in st.session_state:
+    st.session_state.completed_words = set()
+
+# Üst Bilgi ve Skor Paneli
+col_info, col_star = st.columns([2, 1])
+
+with col_info:
+    st.markdown("""
+    <div class='info-box'>
+        🎯 <b>Nasıl Çalışır?</b><br>
+        1. Listeden bir kelime seçin.<br>
+        2. Doğru telaffuzu dinleyin ve kendi sesinizi kaydedin.<br>
+        3. Başardıysanız işaretleyin ve yıldızı kapın!<br>
+        💡 <b>Tureng İpucu:</b> Kelime kutusuna <b>3 saniye basılı tutarak</b> doğrudan kelimenin anlamına Tureng'den bakabilirsiniz.
+    </div>
+    """, unsafe_allow_html=True)
+
+with col_star:
+    st.markdown(f"<div class='star-counter'>⭐ Toplam Yıldız: {st.session_state.stars}</div>", unsafe_allow_html=True)
+
+# Kelime Seçim Alanı
+selected_word = st.selectbox("🎯 Çalışmak istediğin kelimeyi seç:", words)
+
+# Tureng Bağlantılı İnteraktif Kelime Kutusu (Custom HTML/JS Component)
+# 3 saniye basılı tutulduğunda Tureng linkini yeni sekmede açar.
+word_box_html = f"""
+<div id="word-container" style="
+    background-color: #edf2f7;
+    border: 3px solid #cbd5e1;
+    border-radius: 15px;
+    padding: 20px;
+    text-align: center;
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.2s;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+">
+    <div style="font-size: 32px; font-weight: bold; color: #2d3748; margin-bottom: 5px;">{selected_word}</div>
+    <div style="font-size: 14px; color: #4a5568; font-style: italic;">Okunuşu: {word_hints[selected_word]}</div>
+    <div id="status" style="font-size: 11px; color: #a0aec0; margin-top: 8px;">Tureng sözlük için 3 saniye basılı tutun...</div>
+</div>
+
+<script>
+const container = document.getElementById('word-container');
+const statusText = document.getElementById('status');
+let pressTimer;
+
+function startPress() {{
+    container.style.backgroundColor = "#e2e8f0";
+    statusText.innerText = "Bekleyin...";
+    pressTimer = window.setTimeout(function() {{
+        window.open('https://tureng.com/tr/turkce-ingilizce/{selected_word}', '_blank');
+        statusText.innerText = "Tureng açıldı!";
+        container.style.backgroundColor = "#edf2f7";
+    }}, 3000);
+}}
+
+function cancelPress() {{
+    clearTimeout(pressTimer);
+    container.style.backgroundColor = "#edf2f7";
+    statusText.innerText = "Tureng sözlük için 3 saniye basılı tutun...";
+}}
+
+container.addEventListener('mousedown', startPress);
+container.addEventListener('mouseup', cancelPress);
+container.addEventListener('mouseleave', cancelPress);
+
+container.addEventListener('touchstart', startPress);
+container.addEventListener('touchend', cancelPress);
+container.addEventListener('touchcancel', cancelPress);
+</script>
+"""
+
+# HTML Bileşenini Streamlit'e yerleştiriyoruz
+components.html(word_box_html, height=135)
+
+st.markdown("---")
+
+# 1. ADIM: Doğru Okunuşu Dinleme (gTTS)
+st.write("### 1. Doğru Telaffuzu Dinle")
+tts = gTTS(text=selected_word, lang='en', tld='com')
+fp = io.BytesIO()
+tts.write_to_fp(fp)
+fp.seek(0)
+st.audio(fp, format='audio/mp3')
+
+st.markdown("---")
+
+# 2. ADIM: Ses Kaydı (Geçici)
+st.write("### 2. Kendi Sesini Kaydet")
+audio_value = st.audio_input("Mikrofonu açmak için tıklatın ve konuşun:")
+
+if audio_value:
+    st.write("🎤 Kendi sesiniz:")
+    st.audio(audio_value, format="audio/wav")
+
+st.markdown("---")
+
+# 3. ADIM: Başarı ve Konfeti Patlatma
+st.write("### 3. Durumunu Değerlendir")
+
+is_already_done = selected_word in st.session_state.completed_words
+
+# Onay kutusuna basıldığında konfeti tetiklemesi
+is_checked = st.checkbox("🎉 Bu kelimeyi doğru telaffuz etmeyi başardım!", value=is_already_done, key=f"check_{selected_word}")
+
+if is_checked:
+    if selected_word not in st.session_state.completed_words:
+        st.session_state.completed_words.add(selected_word)
+        st.session_state.stars += 1
+        
+        # Konfeti patlatmak için HTML/JS kodu enjekte ediyoruz
+        confetti_html = """
+        <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+        <script>
+            // Farklı açılardan konfeti patlatma efekti
+            var duration = 3 * 1000;
+            var end = Date.now() + duration;
+
+            (function frame() {
+              confetti({
+                particleCount: 5,
+                angle: 60,
+                spread: 55,
+                origin: { x: 0 }
+              });
+              confetti({
+                particleCount: 5,
+                angle: 120,
+                spread: 55,
+                origin: { x: 1 }
+              });
+
+              if (Date.now() < end) {
+                requestAnimationFrame(frame);
+              }
+            }());
+        </script>
+        """
+        components.html(confetti_html, height=0, width=0)
+        st.success(f"Harika! ⭐ Yıldızını kaptın. Kelime listenize eklendi.")
+        st.rerun()
+else:
+    if selected_word in st.session_state.completed_words:
+        st.session_state.completed_words.remove(selected_word)
+        st.session_state.stars -= 1
+        st.rerun()
+
+st.markdown("<br><br><p style='text-align: center; color: #a0aec0; font-size: 11px;'>Bu sistemde ses verileriniz saklanmaz, yenileyince tamamen sıfırlanır.</p>", unsafe_allow_html=True)
