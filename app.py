@@ -3,17 +3,18 @@ from gtts import gTTS
 import io
 from streamlit_mic_recorder import mic_recorder
 
+# 1. Sayfa Ayarları
 st.set_page_config(
-    page_title="Sevimli Kelime Dünyası 🌟",
+    page_title="Let's Speak Right 🌟",
     page_icon="🎈",
     layout="centered"
 )
 
-# Arka plan ve yazı stilleri
+# Çocuk dostu tasarım (CSS)
 st.markdown("""
     <style>
     .stApp { background-color: #FFF5E1; }
-    h1 { color: #FF6B6B; font-family: 'Comic Sans MS', sans-serif; text-align: center; }
+    h1 { color: #FF6B6B; font-family: 'Comic Sans MS', cursive, sans-serif; text-align: center; margin-bottom: 20px; }
     h3 { color: #4D96FF; font-family: 'Comic Sans MS', sans-serif; }
     .tip-box { background-color: #E1FFB1; padding: 15px; border-radius: 15px; border: 2px dashed #6BCB77; margin-bottom: 20px; color: #2C3E50; }
     .star-counter { font-size: 24px; font-weight: bold; text-align: center; background-color: #6BCB77; padding: 10px; border-radius: 20px; color: white; }
@@ -21,6 +22,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# 2. Kelime Sözlüğü
 WORDS_DATA = {
     "the": {"sound": "dı", "tip": "Dilini üst dişlerinin arkasına hafifçe değdirerek 'dı' de!"},
     "join": {"sound": "coyn", "tip": "Eğlenceli bir partiye 'coyn' diye katıldığını hayal et!"},
@@ -61,43 +63,42 @@ WORDS_DATA = {
 if "stars" not in st.session_state:
     st.session_state.stars = 0
 
-st.markdown("<h1>🎈 Kelime Dünyası'na Hoş Geldin! 🎈</h1>", unsafe_allow_html=True)
+# YENİ BAŞLIK
+st.markdown("<h1>🎈 Let's Speak Right 🎈</h1>", unsafe_allow_html=True)
 
 with st.sidebar:
-    st.markdown(f"<div class='star-counter'>⭐ Toplam Yıldızın: {st.session_state.stars}</div>", unsafe_allow_html=True)
-    st.write("### 🔥 Nasıl Oynanır?")
-    st.write("1. Kelime seç. 2. Dinle ve oku. 3. Sesini kaydet. 4. Karşılaştır. 5. Başardım butonuna bas!")
+    st.markdown(f"<div class='star-counter'>⭐ Yıldızlarım: {st.session_state.stars}</div>", unsafe_allow_html=True)
+    st.write("---")
+    st.write("### 🎮 Nasıl Oynanır?")
+    st.write("1. Kelime seç. \n2. Dinle. \n3. Kendi sesini kaydet. \n4. Başardım butonuna bas!")
 
-selected_word = st.selectbox("👉 Çalışmak istediğin kelimeyi seç:", options=list(WORDS_DATA.keys()))
+selected_word = st.selectbox("👉 Bir kelime seç:", options=list(WORDS_DATA.keys()))
 
 if selected_word:
-    st.markdown(f"### 🔤 Seçilen Kelime: **{selected_word}**")
+    st.markdown(f"### 🔤 Kelime: **{selected_word}**")
     st.markdown(f"🗣️ **Okunuşu:** *{WORDS_DATA[selected_word]['sound']}*")
     st.markdown(f"<div class='tip-box'>💡 <b>İpucu:</b> {WORDS_DATA[selected_word]['tip']}</div>", unsafe_allow_html=True)
     
-    # Güvenli ses üretimi (Hata vermemesi için try-except içine alındı)
     try:
         tts = gTTS(text=selected_word, lang='en')
         audio_fp = io.BytesIO()
         tts.write_to_fp(audio_fp)
         st.audio(audio_fp.getvalue(), format='audio/mp3')
-    except Exception as e:
-        st.error("Ses yüklenirken bir sorun oluştu, lütfen sayfayı yenileyin.")
+    except:
+        st.error("Ses yüklenemedi, lütfen tekrar deneyin.")
 
     st.write("---")
-    st.markdown("### 🎙️ Şimdi Sıra Sende! Sesini Kaydet:")
+    st.markdown("### 🎙️ Şimdi Sen Söyle!")
     
-    # Mobil tarayıcılar için optimize edilmiş kayıt butonu
     audio_recorder = mic_recorder(
         start_prompt="🔴 Kaydı Başlat",
         stop_prompt="⏹️ Kaydı Bitir",
-        key=f"rec_{selected_word}"
+        key=f"r_{selected_word}"
     )
     
     if audio_recorder:
-        st.write("🎧 **Senin Sesin:**")
         st.audio(audio_recorder['bytes'], format='audio/wav')
-        st.success("Harika! Kendi sesini doğru sesle karşılaştır.")
+        st.success("Harika gidiyorsun!")
 
     st.write("---")
     
@@ -106,4 +107,6 @@ if selected_word:
         st.balloons()
         st.rerun()
 
-st.markdown("<div class='privacy-note'>🔒 Sesiniz sisteme kaydedilmez, yenilenince silinir.</div>", unsafe_allow_html=True)
+st.markdown("<div class='privacy-note'>🔒 Sesin kaydedilmez, her şey senin tarayıcında kalır. 😊</div>", unsafe_allow_html=True)
+
+Uygulamanızın yeni ismi "Let's Speak Right" hayırlı olsun! Herhangi bir başka değişiklik isterseniz buradayım.
