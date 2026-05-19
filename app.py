@@ -2,7 +2,6 @@ import streamlit as st
 from gtts import gTTS
 import io
 from streamlit_mic_recorder import mic_recorder
-from streamlit_confetti import confetti
 
 # 1. Sayfa Ayarları ve Çocuk Dostu Renkli Tasarım (CSS)
 st.set_page_config(
@@ -106,7 +105,7 @@ with st.sidebar:
     st.write("2. Doğru okunuşu dinle ve ipucunu oku.")
     st.write("3. Mikrofon butonuna basarak sesini kaydet.")
     st.write("4. Kendi sesini dinle ve karşılaştır.")
-    st.write("5. Doğru okuduysan **'BAŞARDIM! 🌟'** butonuna bas ve konfetiyi patlat!")
+    st.write("5. Doğru okuduysan **'BAŞARDIM! 🌟'** butonuna bas ve balonları uçur!")
 
 # 4. Kelime Seçim Kutusu
 selected_word = st.selectbox(
@@ -121,7 +120,7 @@ if selected_word:
     # İpucu Kutusu
     st.markdown(f"<div class='tip-box'>💡 <b>İpucu:</b> {WORDS_DATA[selected_word]['tip']}</div>", unsafe_allow_html=True)
     
-    # Doğru Sesi Dinleme (gTTS ile anlık üretilir, sunucuda saklanmaz)
+    # Doğru Sesi Dinleme
     tts = gTTS(text=selected_word, lang='en')
     audio_fp = io.BytesIO()
     tts.write_to_fp(audio_fp)
@@ -133,7 +132,6 @@ if selected_word:
     # 5. Çocuk İçin Ses Kayıt Bölümü
     st.markdown("### 🎙️ Şimdi Sıra Sende! Sesini Kaydet:")
     
-    # Mikrofon bileşeni (Ses tarayıcıda geçici tutulur, yenilenince uçar)
     audio_recorder = mic_recorder(
         start_prompt="🔴 Kaydı Başlat",
         stop_prompt="⏹️ Kaydı Bitir",
@@ -147,15 +145,13 @@ if selected_word:
 
     st.write("---")
     
-    # 6. Başardım Butonu ve Eğlence
+    # 6. Başardım Butonu (Sadece Balon Uçuran Kesin Çözüm)
     if st.button("🎉 BAŞARDIM! 🌟", use_container_width=True):
         st.session_state.stars += 1
-        # Hata buradaydı, artık fırlatılacak emojileri listeyle söylüyoruz:
-        confetti(emojis=["🌟", "🎈", "🎉", "✨"]) 
-        st.balloons()
+        st.balloons() # Ekranın altından sevimli balonlar uçurur
         st.rerun()
 
-# 7. KVKK / Gizlilik Bildirimi (Çocuklara ve Ailelere Güven)
+# 7. KVKK / Gizlilik Bildirimi
 st.markdown("""
 <div class='privacy-note'>
     🔒 <b>Kişisel Veri Güvenliği Notu:</b> Bu sitede yaptığınız hiçbir ses kaydı sistemlerimize VEYA internete <b>kaydedilmez</b>. 
