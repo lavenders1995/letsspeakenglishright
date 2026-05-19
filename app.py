@@ -150,7 +150,8 @@ if selected_word:
     # 6. Başardım Butonu ve Eğlence
     if st.button("🎉 BAŞARDIM! 🌟", use_container_width=True):
         st.session_state.stars += 1
-        confetti()
+        # Hata buradaydı, artık fırlatılacak emojileri listeyle söylüyoruz:
+        confetti(emojis=["🌟", "🎈", "🎉", "✨"]) 
         st.balloons()
         st.rerun()
 
