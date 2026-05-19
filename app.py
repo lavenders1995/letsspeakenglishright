@@ -108,4 +108,3 @@ if selected_word:
         st.rerun()
 
 st.markdown("<div class='privacy-note'>🔒 Sesin kaydedilmez, her şey senin tarayıcında kalır. 😊</div>", unsafe_allow_html=True)
-Uygulamanızın yeni ismi "Let's Speak Right" hayırlı olsun! Herhangi bir başka değişiklik isterseniz buradayım.
